@@ -1,8 +1,11 @@
 {
-  "name": "my-transit-app",
+  "name": "movitop-software",
   "version": "0.1.0",
   "private": true,
-  "main": "electron-main.js",
+  "main": "background.js",
+  "homepage": "./",
+  "description": "Transit desktop app",
+  "author": "Your Name",
   "dependencies": {
     "@emotion/react": "^11.11.0",
     "@emotion/styled": "^11.11.0",
@@ -30,7 +33,9 @@
     "electron-builder": "^24.9.1",
     "inquirer": "^8.2.7",
     "node-downloader-helper": "^2.1.10",
-    "shelljs": "^0.8.5"
+    "shelljs": "^0.8.5",
+    "concurrently": "^8.2.0",
+    "wait-on": "^7.0.1"
   },
   "scripts": {
     "start": "react-scripts start",
@@ -61,32 +66,62 @@
     ]
   },
   "build": {
-    "appId": "com.mytransi.app",
-    "productName": "MyTransitApp",
+    "appId": "com.mytrmovitop.app",
+    "productName": "movitop-software",
     "files": [
       "build/**/*",
-      "electron-main.js"
+      "background.js"
     ],
-    "extraResources": [
-      {
-        "from": "backend/",
-        "to": "backend",
-        "filter": [
-          "otp.jar",
-          "graph.obj",
-          "router-config.json"
-        ]
-      },
-      {
-        "from": "jre/${os}",
-        "to": "jre"
-      }
-    ],
-    "win": {
-      "target": "nsis"
+    "extraMetadata": {
+      "main": "background.js"
     },
     "mac": {
-      "target": "dmg"
+      "target": "dmg",
+      "extraResources": [
+        {
+          "from": "backend/",
+          "to": "backend",
+          "filter": [
+            "otp.jar",
+            "graph.obj",
+            "router-config.json"
+          ]
+        },
+        {
+          "from": "jre/mac/Contents/Home",
+          "to": "jre"
+        }
+      ]
+    },
+    "win": {
+      "target": "nsis",
+      "extraResources": [
+        {
+          "from": "backend/",
+          "to": "backend",
+          "filter": [
+            "otp.jar",
+            "graph.obj",
+            "router-config.json"
+          ]
+        },
+        {
+          "from": "jre/win",
+          "to": "jre"
+        }
+      ]
     }
+  },
+  "devBuild": {
+    "extraResources": [
+      {
+        "from": "jre/mac/Contents/Home",
+        "to": "jre"
+      },
+      {
+        "from": "jre/win",
+        "to": "jre"
+      }
+    ]
   }
 }
