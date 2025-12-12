@@ -1,0 +1,30 @@
+# תלויות של Node.js (מותקנות ע"י npm install)
+node_modules/
+
+# תוצרי בנייה (React & Electron)
+build/
+dist/
+
+# קבצי מערכת
+.DS_Store
+Thumbs.db
+
+# --- OpenTripPlanner Backend ---
+# נתעלם מהקבצים הגדולים, הסקריפט יוריד/ייצור אותם
+backend/data/
+backend/graph.obj
+backend/otp.jar
+
+# --- Java Runtime ---
+# לא מעלים את ג'אווה לגיט (זה כבד מאוד). המשתמש יוריד לבד או דרך סקריפט.
+jre/
+
+# --- מפות ונתונים ---
+# קובץ המפה הוא ענק. עדיף לתת לינק להורדה ב-README או להשתמש ב-Git LFS
+public/israel.pmtiles
+
+# קבצי סביבה ומפתחות (אם יש)
+.env
+.env.local
+public/*.mbtiles
+public/*.pmtiles

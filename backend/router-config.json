@@ -1,0 +1,9 @@
+{
+  "routingDefaults": {
+    "walkSpeed": 1.3,
+    "transferSlack": 120,
+    "boardCost": 300,
+    "walkReluctance": 3.0,
+    "waitReluctance": 2.0
+  }
+}
