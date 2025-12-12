@@ -1,200 +1,254 @@
-const inquirer = require("inquirer");
-const shell = require("shelljs");
-const fs = require("fs");
-const path = require("path");
-const { DownloaderHelper } = require("node-downloader-helper");
-const byteSize = require("byte-size"); // להצגת גודל קובץ יפה (MB/GB)
+const inquirer = require('inquirer');
+const shell = require('shelljs');
+const fs = require('fs');
+const path = require('path');
+const { DownloaderHelper } = require('node-downloader-helper');
+const byteSize = require('byte-size');
 
-const BASE_DIR = path.join(__dirname, "..");
-const BACKEND_DIR = path.join(BASE_DIR, "backend");
-const DATA_DIR = path.join(BACKEND_DIR, "data");
+const BASE_DIR = path.join(__dirname, '..');
+const BACKEND_DIR = path.join(BASE_DIR, 'backend');
+const DATA_DIR = path.join(BACKEND_DIR, 'data');
 
-// --- כאן מוגדר מאיפה הקבצים יורדים ---
+// הגדרת קבצים
 const FILES = {
-  otp: {
-    name: "otp.jar",
-    url: "https://repo1.maven.org/maven2/org/opentripplanner/otp/2.5.0/otp-2.5.0-shaded.jar",
-  },
-  osm: {
-    name: "israel-and-palestine.osm.pbf",
-    url: "https://download.geofabrik.de/asia/israel-and-palestine-latest.osm.pbf",
-  },
-  gtfs: {
-    name: "gtfs.zip",
-    url: "https://gtfs.mot.gov.il/gtfsfiles/israel-public-transportation.zip",
-  },
+    otp: { 
+        name: 'otp.jar', 
+        url: 'https://repo1.maven.org/maven2/org/opentripplanner/otp/2.5.0/otp-2.5.0-shaded.jar' 
+    },
+    osm: { 
+        name: 'israel-and-palestine.osm.pbf', 
+        url: 'https://download.geofabrik.de/asia/israel-and-palestine-latest.osm.pbf' 
+    },
+    gtfs: { 
+        name: 'gtfs.zip', 
+        url: 'https://gtfs.mot.gov.il/gtfsfiles/israel-public-transportation.zip' 
+    }
 };
 
-// פונקציית עזר להורדה עם חיווי גרפי
+// פונקציית הורדה עם פרוגרס בר משופר
 const downloadWithProgress = (url, saveDir, fileName) => {
-  return new Promise((resolve, reject) => {
-    const dl = new DownloaderHelper(url, saveDir, {
-      fileName: fileName,
-      override: true, // דורס קובץ קיים אם יש
+    return new Promise((resolve, reject) => {
+        const dl = new DownloaderHelper(url, saveDir, {
+            fileName: fileName,
+            override: true,
+        });
+
+        dl.on('start', () => console.log(`⬇️  Starting download: ${fileName}`));
+        
+        dl.on('progress', (stats) => {
+            const progress = Math.round(stats.progress);
+            const downloaded = byteSize(stats.downloaded);
+            const total = byteSize(stats.total);
+            const speed = byteSize(stats.speed);
+            
+            // שימוש ב-readline כדי לעדכן את אותה שורה
+            try {
+                process.stdout.clearLine();
+                process.stdout.cursorTo(0);
+                const barLength = 20;
+                const filled = Math.floor((progress / 100) * barLength);
+                const bar = '█'.repeat(filled) + '░'.repeat(barLength - filled);
+                process.stdout.write(`[${bar}] ${progress}% | ${downloaded}/${total} | 🚀 ${speed}/s`);
+            } catch (e) {
+                // במקרה של שגיאת טרמינל, לא נדפיס כלום כדי לא לשבור
+            }
+        });
+
+        dl.on('end', () => {
+            process.stdout.clearLine(); // ניקוי שורת הפרוגרס
+            process.stdout.cursorTo(0);
+            console.log(`✅ Download Complete: ${fileName}`);
+            resolve();
+        });
+
+        dl.on('error', (err) => {
+            console.error(`❌ Error downloading ${fileName}:`, err);
+            reject(err);
+        });
+
+        dl.start().catch(err => reject(err));
     });
-
-    // משתנים לעיצוב
-    let startTime = Date.now();
-
-    dl.on("start", () => {
-      console.log(`⬇️  Starting download: ${fileName}`);
-    });
-
-    dl.on("progress", (stats) => {
-      // חישוב אחוזים
-      const progress = Math.round(stats.progress);
-
-      // המרת גדלים לפורמט קריא (למשל 15MB)
-      const downloaded = byteSize(stats.downloaded);
-      const total = byteSize(stats.total);
-      const speed = byteSize(stats.speed); // מהירות לשנייה
-
-      // נקה את השורה האחרונה בטרמינל וכתוב מחדש
-      process.stdout.clearLine();
-      process.stdout.cursorTo(0);
-
-      // הפלט: [=====>   ] 50% | 120MB/240MB | 5.2 MB/s | ETA: 12s
-      const barLength = 20;
-      const filledBar = "█".repeat((progress / 100) * barLength);
-      const emptyBar = "░".repeat(barLength - filledBar.length);
-
-      process.stdout.write(
-        `[${filledBar}${emptyBar}] ${progress}% | ` +
-          `${downloaded}/${total} | ` +
-          `🚀 ${speed}/s | ` +
-          `⏳ ETA: ${Math.floor(stats.eta)}s`
-      );
-    });
-
-    dl.on("end", () => {
-      process.stdout.clearLine();
-      process.stdout.cursorTo(0);
-      console.log(`✅ Download Complete: ${fileName}\n`);
-      resolve();
-    });
-
-    dl.on("error", (err) => {
-      console.error("\n❌ Download Failed:", err);
-      reject(err);
-    });
-
-    dl.start().catch((err) => reject(err));
-  });
 };
 
 async function main() {
-  console.log("🚀 Starting Transit App Build Pipeline...\n");
+    console.log("🚀 Starting Transit App Build Pipeline...\n");
 
-  // 1. שאלת המשתמש
-  const { downloadFiles } = await inquirer.prompt([
-    {
-      type: "checkbox",
-      name: "downloadFiles",
-      message: "איזה קבצים תרצה להוריד מחדש?",
-      choices: [
-        { name: "otp.jar (OTP Server - ~180MB)", value: "otp" },
-        { name: "osm.pbf (Map Data - ~250MB)", value: "osm" },
-        { name: "gtfs.zip (Transport Data - ~100MB)", value: "gtfs" },
-      ],
-    },
-  ]);
+    // --- שלב 1: הורדות ---
+    const { downloadFiles } = await inquirer.prompt([
+        {
+            type: 'checkbox',
+            name: 'downloadFiles',
+            message: 'Select files to download (Space to select, Enter to confirm):',
+            choices: [
+                { name: 'otp.jar (OTP Server)', value: 'otp' },
+                { name: 'osm.pbf (Map Data)', value: 'osm' },
+                { name: 'gtfs.zip (Transport Data)', value: 'gtfs' }
+            ]
+        }
+    ]);
 
-  // יצירת התיקייה אם לא קיימת
-  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+    // יצירת תיקיית Data אם לא קיימת
+    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 
-  // ביצוע ההורדות
-  for (const fileKey of downloadFiles) {
-    const fileInfo = FILES[fileKey];
-    try {
-      await downloadWithProgress(fileInfo.url, DATA_DIR, fileInfo.name);
-    } catch (e) {
-      console.error("Critical error during download. Exiting.");
-      process.exit(1);
+    if (downloadFiles.length > 0) {
+        for (const fileKey of downloadFiles) {
+            try {
+                await downloadWithProgress(FILES[fileKey].url, DATA_DIR, FILES[fileKey].name);
+            } catch (e) {
+                console.error("Download failed. Exiting.");
+                process.exit(1);
+            }
+        }
+    } else {
+        console.log("⏩ Skipping downloads (No files selected).");
     }
-  }
 
-  // 2. הרצת תיקון GTFS (Python)
-  // רק אם הורדנו GTFS או אם המשתמש רוצה להריץ תיקון
-  if (
-    downloadFiles.includes("gtfs") ||
-    fs.existsSync(path.join(DATA_DIR, "gtfs.zip"))
-  ) {
-    console.log("🐍 Running GTFS Fixer (Python)...");
-    shell.cd(BACKEND_DIR);
-    // שימוש ב-python3 או python תלוי במערכת
-    const pyCmd = shell.which("python3") ? "python3" : "python";
-    if (shell.exec(`${pyCmd} ../scripts/fix_gtfs.py`).code !== 0) {
-      console.error("❌ Python script failed!");
-      process.exit(1);
+    // --- שלב ביניים: סידור קבצים (הזזת otp.jar) ---
+    // המטרה: otp.jar צריך להיות ב-backend, והנתונים ב-backend/data
+    const otpInData = path.join(DATA_DIR, 'otp.jar');
+    const otpInBackend = path.join(BACKEND_DIR, 'otp.jar');
+
+    if (fs.existsSync(otpInData)) {
+        console.log("📦 Moving otp.jar to backend root (recommended structure)...");
+        try {
+            // אם כבר קיים ב-backend, נמחק אותו קודם
+            if (fs.existsSync(otpInBackend)) fs.unlinkSync(otpInBackend);
+            fs.renameSync(otpInData, otpInBackend);
+        } catch (e) {
+            console.error("❌ Failed to move otp.jar:", e);
+        }
     }
-    shell.cd(BASE_DIR);
-  }
 
-  // 3. בניית הגרף
-  const { ramSize } = await inquirer.prompt([
-    {
-      type: "input",
-      name: "ramSize",
-      message: "כמה RAM להקצות לבניית הגרף? (לדוגמה: 12G, 8G)",
-      default: "12G",
-    },
-  ]);
+    // --- שלב 2: תיקון GTFS ---
+    // נבדוק אם יש קובץ GTFS, ואם כן נשאל האם לתקן
+    const gtfsPath = path.join(DATA_DIR, 'gtfs.zip');
+    
+    if (fs.existsSync(gtfsPath)) {
+        console.log("\n--- GTFS Fixer ---");
+        const { runFixer } = await inquirer.prompt([
+            {
+                type: 'list', // שיניתי ל-List כדי שיהיה ברור יותר
+                name: 'runFixer',
+                message: 'Do you want to run the Python GTFS Fixer script?',
+                choices: [
+                    { name: 'Yes (Recommended for Israel data)', value: true },
+                    { name: 'No (Skip)', value: false }
+                ]
+            }
+        ]);
 
-  // יצירת router-config.json
-  const routerConfig = {
-    routingDefaults: {
-      walkSpeed: 1.3,
-      transferSlack: 120,
-      boardCost: 300,
-      walkReluctance: 3.0,
-      waitReluctance: 2.0,
-    },
-  };
-  fs.writeFileSync(
-    path.join(BACKEND_DIR, "router-config.json"),
-    JSON.stringify(routerConfig, null, 2)
-  );
-
-  console.log(`\n☕ Building Graph with ${ramSize} RAM...`);
-
-  // הפקודה לבניית הגרף (Java)
-  // מניח ש-Java מותקן במחשב או בנתיב המערכת כרגע לצורך הבנייה
-  if (
-    shell.exec(
-      `java -Xmx${ramSize} -jar backend/data/otp.jar --build --save backend/data`
-    ).code !== 0
-  ) {
-    console.error("❌ Graph build failed!");
-    process.exit(1);
-  }
-
-  // הזזת ה-Graph שנוצר למיקום הסופי
-  if (fs.existsSync("backend/data/graph.obj")) {
-    console.log("Moving graph.obj to backend folder...");
-    shell.mv("backend/data/graph.obj", "backend/graph.obj");
-  }
-
-  // 4. יצירת Stops.json
-  console.log("\n⚡ Generating stops.json for Frontend...");
-  if (shell.exec("node scripts/generate_stops.js").code !== 0) {
-    console.error("❌ Stops generation failed!");
-    process.exit(1);
-  }
-
-  // 5. ניקוי
-  console.log("\n🧹 Cleaning up raw files...");
-  const filesToDelete = [
-    path.join(BACKEND_DIR, "data/gtfs.zip"),
-    path.join(BACKEND_DIR, "data/israel-and-palestine.osm.pbf"),
-  ];
-  filesToDelete.forEach((f) => {
-    if (fs.existsSync(f)) {
-      fs.unlinkSync(f);
-      console.log(`Deleted: ${path.basename(f)}`);
+        if (runFixer) {
+            console.log("🐍 Running Python script...");
+            shell.cd(BACKEND_DIR);
+            const pyCmd = shell.which('python3') ? 'python3' : 'python';
+            
+            // הרצה ובדיקת שגיאות
+            if (shell.exec(`${pyCmd} ../scripts/fix_gtfs.py`).code !== 0) {
+                console.error("❌ Python script failed! Stopping.");
+                process.exit(1);
+            }
+            shell.cd(BASE_DIR);
+        } else {
+            console.log("⏩ Skipped GTFS Fixer.");
+        }
+    } else {
+        console.log("⚠️  No GTFS file found in data folder. Skipping fixer.");
     }
-  });
 
-  console.log("\n✅✅✅ PROCESS COMPLETE! You can now run 'npm start'.");
+    // --- שלב 3: בניית הגרף ---
+    console.log("\n--- Graph Build ---");
+    const { ramSize } = await inquirer.prompt([
+        {
+            type: 'input',
+            name: 'ramSize',
+            message: 'Allocated RAM? (e.g. 12)',
+            default: '12'
+        }
+    ]);
+
+    // תיקון אוטומטי ל-RAM
+    let memory = ramSize.toUpperCase().trim();
+    if (!memory.endsWith('G') && !memory.endsWith('M')) {
+        memory += 'G';
+    }
+
+    // הגדרת הנתיב הנכון ל-JAR
+    // עכשיו אנחנו בודקים איפה הוא באמת נמצא
+    let jarPathToUse = "";
+    if (fs.existsSync(otpInBackend)) {
+        jarPathToUse = "backend/otp.jar"; // הנתיב המועדף
+    } else if (fs.existsSync(otpInData)) {
+        jarPathToUse = "backend/data/otp.jar"; // נתיב גיבוי (אם ההעברה נכשלה)
+    } else {
+        console.error("❌ Error: otp.jar not found in 'backend' or 'backend/data'!");
+        console.error("Please download otp.jar first.");
+        process.exit(1);
+    }
+
+    // יצירת קובץ קונפיגורציה
+    const routerConfig = {
+        "routingDefaults": {
+            "walkSpeed": 1.3,
+            "transferSlack": 120,
+            "boardCost": 300,
+            "walkReluctance": 3.0,
+            "waitReluctance": 2.0
+        }
+    };
+    fs.writeFileSync(path.join(BACKEND_DIR, 'router-config.json'), JSON.stringify(routerConfig, null, 2));
+
+    console.log(`\n☕ Building Graph with ${memory} RAM using ${jarPathToUse}...`);
+    
+    // הפקודה המדויקת:
+    // 1. jarPathToUse -> המיקום האמיתי של הקובץ
+    // 2. --build --save backend/data -> אומר לו לקחת את הנתונים מתיקיית הדאטה
+    const buildCmd = `java -Xmx${memory} -jar "${jarPathToUse}" --build --save backend/data`;
+
+    if (shell.exec(buildCmd).code !== 0) {
+        console.error("❌ Graph build failed!");
+        process.exit(1);
+    }
+
+    // הזזת הגרף שנוצר (הוא נוצר איפה שהדאטה נמצא) למיקום הראשי
+    const graphInData = path.join(DATA_DIR, 'graph.obj');
+    const graphInBackend = path.join(BACKEND_DIR, 'graph.obj');
+
+    if (fs.existsSync(graphInData)) {
+        console.log("🚚 Moving graph.obj to backend root...");
+        try {
+            if (fs.existsSync(graphInBackend)) fs.unlinkSync(graphInBackend);
+            fs.renameSync(graphInData, graphInBackend);
+        } catch (e) {
+            console.error("Warning: Could not move graph.obj:", e);
+        }
+    }
+
+    // --- שלב 4: יצירת JSON לריאקט ---
+    console.log("\n⚡ Generating stops.json...");
+    if (shell.exec('node scripts/generate_stops.js').code !== 0) {
+        console.error("❌ Stops generation failed!");
+        process.exit(1);
+    }
+
+    // --- שלב 5: ניקוי ---
+    console.log("\n🧹 Cleaning up raw files...");
+    const cleanupPath = [
+        path.join(BACKEND_DIR, 'data/gtfs.zip'),
+        path.join(BACKEND_DIR, 'data/israel-and-palestine.osm.pbf')
+    ];
+    
+    cleanupPath.forEach(f => {
+        if (fs.existsSync(f)) {
+            try {
+                fs.unlinkSync(f);
+                console.log(`Deleted: ${path.basename(f)}`);
+            } catch (e) {
+                // מתעלם משגיאות מחיקה
+            }
+        }
+    });
+
+    console.log("\n✅✅✅ BUILD COMPLETE!");
 }
 
 main();
