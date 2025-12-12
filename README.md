@@ -34,8 +34,8 @@
 ### 1. שכפול המאגר והתקנת תלויות
 
 ```bash
-git clone [https://github.com/YourUsername/MyTransitApp.git](https://github.com/YourUsername/MyTransitApp.git)
-cd MyTransitApp
+git clone https://github.com/a-true-man/movitop-software.git
+cd movitop-software
 npm install
 ```
 
@@ -49,9 +49,9 @@ npm install
 2.  חלץ את הקבצים.
 3.  מקם אותם במבנה הבא בתוך תיקיית הפרויקט:
 
-> **Windows:** `MyTransitApp/jre/win`
+> **Windows:** `movitop-software/jre/win`
 >
-> **Mac:** `MyTransitApp/jre/mac`
+> **Mac:** `movitop-software/jre/mac`
 
 ### 3\. הגדרת מפות (אופציונלי)
 
@@ -119,7 +119,7 @@ chmod +x jre/mac/Contents/Home/bin/java
 ## 📂 מבנה הפרויקט
 
 ```text
-MyTransitApp/
+movitop-software/
 ├── 📂 backend/        # OTP Server & Graph data
 ├── 📂 jre/            # Portable Java Runtime (win/mac)
 ├── 📂 public/         # Static assets & Offline Map
