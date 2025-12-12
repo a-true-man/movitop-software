@@ -1,7 +1,7 @@
 # 🚌 מוביטופ - זמני תחבורה אופליין - תוכנה
 
-![צילום מסך 2025-12-12 ב-10.06.27.png](/assets/uploads/files/1765528374691-צילום-מסך-2025-12-12-ב-10.06.27-resized.png) 
 
+<img width="1392" height="912" alt="תדמית" src="https://github.com/user-attachments/assets/fe47ca28-fd00-4205-9a0c-db137ca72e16" />
 
 ![Version](https://img.shields.io/badge/version-1.0.0-blue?style=flat-square)
 ![React](https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react&logoColor=black)
