@@ -1,5 +1,8 @@
 # 🚌 מוביטופ - זמני תחבורה אופליין - תוכנה
 
+
+<img width="1392" height="912" alt="תדמית" src="https://github.com/user-attachments/assets/fe47ca28-fd00-4205-9a0c-db137ca72e16" />
+
 ![Version](https://img.shields.io/badge/version-1.0.0-blue?style=flat-square)
 ![React](https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react&logoColor=black)
 ![Electron](https://img.shields.io/badge/Electron-28-47848F?style=flat-square&logo=electron&logoColor=white)
@@ -20,7 +23,12 @@
 
 ---
 
-## 🛠️ דרישות מוקדמות (Prerequisites)
+##🛠️ דרישות מוקדמות (Prerequisites)
+
+* ליצירת גרף מינימום 12 GB RAM פנויים ולהרצת רילייס מספיק 4GB
+
+
+
 
 לפני שמתחילים, וודא שיש לך את הרכיבים הבאים:
 
