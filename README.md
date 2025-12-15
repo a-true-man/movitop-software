@@ -1,6 +1,5 @@
 # 🚌 מוביטופ - זמני תחבורה אופליין - תוכנה
 
-
 <img width="1392" height="912" alt="תדמית" src="https://github.com/user-attachments/assets/fe47ca28-fd00-4205-9a0c-db137ca72e16" />
 
 ![Version](https://img.shields.io/badge/version-1.0.0-blue?style=flat-square)
@@ -25,10 +24,7 @@
 
 ##🛠️ דרישות מוקדמות (Prerequisites)
 
-* ליצירת גרף מינימום 12 GB RAM פנויים ולהרצת רילייס מספיק 4GB
-
-
-
+- ליצירת גרף מינימום 12 GB RAM פנויים ולהרצת רילייס מספיק 4GB
 
 לפני שמתחילים, וודא שיש לך את הרכיבים הבאים:
 
@@ -68,6 +64,8 @@ npm install
 1.  הורד את הקובץ `israel.pmtiles` (מאתר [Protomaps](https://protomaps.com/) או מקור אחר).
 2.  העבר אותו לתיקייה: `public/israel.pmtiles`.
 
+(באם לא מצאתם להורדה תוכלו להשתמש בכלי planetiler.jar ליצירה חדשה מקובץ osm.pbf)
+
 ---
 
 ## ⚙️ בניית הנתונים (Automation)
@@ -87,16 +85,29 @@ npm run deploy
 3.  בונה את `graph.obj` באמצעות Java.
 4.  מייצר קובץ `stops.json` קליל עבור החיפוש תחנות.
 
+הרצת סקריפט ליצירת קובץ נקודות עניין ישראליות לחיפוש מהיר
+הרץ בטרמינל:
+
+```bash
+node scripts/downloadPois.js
+```
+
 ---
 
 ## ▶️ הרצה ושימוש
 
 ### מצב פיתוח (Development)
 
-מריץ את ה-React ואת ה-Electron במקביל:
+נריץ את ה-React ואת ה-Electron במקביל:
 
 ```bash
 npm start
+```
+
+פתחו טרמינל נוסף, והריצו במקביל.
+
+```bash
+java -Xmx4G -jar backend/otp.jar --load backend --port 8080
 ```
 
 ### יצירת קובץ התקנה (Build)

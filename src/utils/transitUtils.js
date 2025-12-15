@@ -1,5 +1,3 @@
-// src/utils/transitUtils.js
-//כל הפונקציות של חישובי מחיר, צבעים וזמנים (לוגיקה טהורה).
 import polyline from "@mapbox/polyline";
 
 // --- מנוע חישוב מרחקים ---
@@ -19,7 +17,6 @@ export const getDistanceFromLatLonInKm = (lat1, lon1, lat2, lon2) => {
   return R * c;
 };
 
-// --- מנוע חישוב מחירים ---
 const getLegPrice = (mode, distKm) => {
   if (mode === "RAIL") {
     if (distKm <= 15) return 11.5;
@@ -42,7 +39,12 @@ export const calculateTotalFare = (legs) => {
   let activeTicket = null;
   for (let leg of legs) {
     if (leg.mode === "WALK") continue;
-    const distKm = (leg.distance || 0) / 1000;
+    const distKm = getDistanceFromLatLonInKm(
+      leg.from.lat,
+      leg.from.lon,
+      leg.to.lat,
+      leg.to.lon
+    );
     const price = getLegPrice(leg.mode, distKm);
     if ((leg.mode === "BUS" || leg.mode === "TRAM") && distKm <= 15) {
       let isFreeTransfer = false;
@@ -73,14 +75,9 @@ export const calculateTotalFare = (legs) => {
   return totalPrice;
 };
 
-// --- צבעים ועיצוב ---
 export const getLegColor = (leg) => {
   if (leg.mode === "WALK") return "#9ca3af";
-
-  if (leg.route?.color) {
-    return `#${leg.route.color}`;
-  }
-
+  if (leg.route?.color) return `#${leg.route.color}`;
   const colors = [
     "#ef4444",
     "#f97316",
@@ -94,17 +91,14 @@ export const getLegColor = (leg) => {
     "#d946ef",
     "#f43f5e",
   ];
-
   const name = leg.route?.shortName || leg.mode;
   let hash = 0;
   for (let i = 0; i < name.length; i++) {
     hash = name.charCodeAt(i) + ((hash << 5) - hash);
   }
-
   return colors[Math.abs(hash) % colors.length];
 };
 
-// --- פורמט זמנים ---
 export const formatDuration = (seconds) => {
   const mins = Math.round(seconds / 60);
   if (mins < 60) return `${mins} דק'`;
@@ -131,4 +125,170 @@ export const getDepartureStrings = (startTime) => {
   if (diff <= 5) return { text: `בעוד ${diff} דק'`, color: "#d32f2f" };
   if (diff > 15) return { text: `בעוד ${diff} דק'`, color: "grey" };
   return { text: `בעוד ${diff} דק'`, color: "#2e7d32" };
+};
+
+// --- לוגיקת תרגום שמות והוראות ---
+
+const translateStreetName = (name) => {
+  if (!name) return "שביל";
+  const lower = name.toLowerCase().trim();
+
+  // תרגום מונחי OTP גנריים
+  if (lower === "origin" || lower === "start") return "נקודת המוצא";
+  if (lower === "destination" || lower === "end") return "היעד";
+
+  if (lower === "path" || lower === "footway") return "שביל הליכה";
+  if (lower === "sidewalk") return "מדרכה";
+  if (lower === "track") return "דרך עפר";
+  if (lower === "steps" || lower === "stairs") return "מדרגות";
+  if (lower === "service road" || lower === "road" || lower === "unnamed road")
+    return "כביש שירות";
+  if (lower === "pedestrian") return "מדרחוב";
+  if (lower === "cycleway") return "שביל אופניים";
+  if (lower === "crossing") return "מעבר חציה";
+  if (lower === "roundabout") return "כיכר";
+
+  return name;
+};
+
+export const getInstructionString = (step) => {
+  const dir = step.relativeDirection;
+
+  // טיפול בשמות גנריים או חסרים
+  let rawStreet = step.streetName || (step.area ? "אזור הליכה" : "שביל");
+
+  // אם השם הוא "Origin" או "Destination" (קורה לעיתים ב-API), נתרגם ידנית
+  if (rawStreet === "Origin") rawStreet = "נקודת המוצא";
+  if (rawStreet === "Destination") rawStreet = "היעד";
+
+  const street = translateStreetName(rawStreet);
+
+  // בדיקה אם זה כיכר
+  const isRoundabout = dir.startsWith("CIRCLE");
+  // בדיקה אם שם הרחוב בכיכר הוא גנרי ומבלבל ("כביש שירות")
+  const isGenericRoundabout =
+    isRoundabout && (street === "כביש שירות" || street === "כיכר");
+
+  const dict = {
+    DEPART: `צא מ-${street}`,
+    HARD_LEFT: `פנה בחדות שמאלה ל-${street}`,
+    LEFT: `פנה שמאלה ל-${street}`,
+    SLIGHTLY_LEFT: `פנה מעט שמאלה ל-${street}`,
+    SLIGHT_LEFT: `פנה מעט שמאלה ל-${street}`,
+    CONTINUE: `המשך ישר ב-${street}`,
+    SLIGHTLY_RIGHT: `פנה מעט ימינה ל-${street}`,
+    SLIGHT_RIGHT: `פנה מעט ימינה ל-${street}`,
+    RIGHT: `פנה ימינה ל-${street}`,
+    HARD_RIGHT: `פנה בחדות ימינה ל-${street}`,
+
+    // בכיכר: אם הרחוב הוא סתם "כביש שירות", נכתוב רק "צא ביציאה"
+    CIRCLE_CLOCKWISE: isGenericRoundabout
+      ? `בכיכר, צא ביציאה והמשך`
+      : `בכיכר, צא ל-${street}`,
+    CIRCLE_COUNTERCLOCKWISE: isGenericRoundabout
+      ? `בכיכר, צא ביציאה והמשך`
+      : `בכיכר, צא ל-${street}`,
+
+    ELEVATOR: `קח מעלית ל-${street}`,
+    UTURN_LEFT: `בצע פניית פרסה ל-${street}`,
+    UTURN_RIGHT: `בצע פניית פרסה ל-${street}`,
+  };
+
+  return dict[dir] || `${dir} לכיוון ${street}`;
+};
+
+// --- חישוב זמנים והחזרת סטטוס (אמת/משוער) ---
+export const getLegStopsWithRealTimes = (leg) => {
+  if (leg.mode === "WALK") return { stops: [], isEstimated: false };
+
+  // 1. נסיון GTFS (אמת)
+  if (leg.trip && leg.trip.stoptimes) {
+    const allStops = leg.trip.stoptimes;
+    const fromId = leg.from?.stop?.gtfsId;
+    const toId = leg.to?.stop?.gtfsId;
+    const fromName = leg.from?.name;
+    const toName = leg.to?.name;
+
+    let startIndex = -1;
+    let endIndex = -1;
+
+    if (fromId && toId) {
+      startIndex = allStops.findIndex((s) => s.stop.gtfsId === fromId);
+      endIndex = allStops.findIndex((s) => s.stop.gtfsId === toId);
+    }
+
+    if (startIndex === -1) {
+      startIndex = allStops.findIndex((s) => s.stop.name === fromName);
+    }
+    if (endIndex === -1) {
+      const searchFrom = startIndex === -1 ? 0 : startIndex;
+      const foundAfter = allStops
+        .slice(searchFrom)
+        .findIndex((s) => s.stop.name === toName);
+      if (foundAfter !== -1) {
+        endIndex = searchFrom + foundAfter;
+      }
+    }
+
+    if (startIndex !== -1 && endIndex !== -1 && startIndex < endIndex) {
+      const baseDate = new Date(leg.startTime);
+      baseDate.setHours(0, 0, 0, 0);
+      const baseTimestamp = baseDate.getTime();
+      const realStops = allStops.slice(startIndex + 1, endIndex);
+
+      if (realStops.length > 0) {
+        return {
+          stops: realStops.map((item) => ({
+            name: item.stop.name,
+            lat: item.stop.lat,
+            lon: item.stop.lon,
+            arrival: baseTimestamp + item.scheduledArrival * 1000,
+          })),
+          isEstimated: false, // מידע אמין
+        };
+      }
+    }
+  }
+
+  // 2. Fallback (משוער)
+  const stops = leg.intermediateStops || [];
+  if (stops.length === 0) return { stops: [], isEstimated: false };
+
+  const allPoints = [leg.from, ...stops, leg.to];
+  let totalDist = 0;
+  const dists = [];
+
+  for (let i = 0; i < allPoints.length - 1; i++) {
+    const d = getDistanceFromLatLonInKm(
+      allPoints[i].lat,
+      allPoints[i].lon,
+      allPoints[i + 1].lat,
+      allPoints[i + 1].lon
+    );
+    totalDist += d;
+    dists.push(d);
+  }
+
+  const legDuration = leg.endTime - leg.startTime;
+  let currentAccumulatedDist = 0;
+
+  const calculatedStops = stops.map((stop, i) => {
+    currentAccumulatedDist += dists[i];
+    let ratio =
+      totalDist > 0
+        ? currentAccumulatedDist / totalDist
+        : (i + 1) / (stops.length + 1);
+
+    return {
+      name: stop.name,
+      lat: stop.lat,
+      lon: stop.lon,
+      arrival: leg.startTime + legDuration * ratio,
+    };
+  });
+
+  return {
+    stops: calculatedStops,
+    isEstimated: true, // סימון שהמידע מחושב
+  };
 };

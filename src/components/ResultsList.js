@@ -1,6 +1,3 @@
-// src/components/ResultsList.js
-//קומפוננטת רשימת התוצאות
-// רשימת התוצאות (הכרטיסיות).
 import React from "react";
 import { Box, Typography, Stack, Card, CardActionArea } from "@mui/material";
 import DirectionsBusIcon from "@mui/icons-material/DirectionsBus";
@@ -10,7 +7,8 @@ import ArrowBackIosNewIcon from "@mui/icons-material/ArrowBackIosNew";
 import ScheduleIcon from "@mui/icons-material/Schedule";
 import CurrencyShekelIcon from "@mui/icons-material/MonetizationOn";
 
-// ייבוא פונקציות העזר
+import ItineraryDetails from "./ItineraryDetails";
+
 import {
   getLegColor,
   calculateTotalFare,
@@ -22,31 +20,35 @@ export default function ResultsList({
   itineraries,
   selectedIndex,
   onItineraryClick,
+  onBackToResults,
 }) {
+  // אם נבחר מסלול - הצג את מסך הפירוט
+  if (selectedIndex !== null && itineraries[selectedIndex]) {
+    return (
+      <ItineraryDetails
+        itinerary={itineraries[selectedIndex]}
+        onBack={onBackToResults}
+      />
+    );
+  }
+
+  // אם אין תוצאות
   if (!itineraries || itineraries.length === 0) return null;
 
+  // אחרת - הצג את רשימת הכרטיסיות
   return (
     <Box sx={{ flex: 1, overflowY: "auto", bgcolor: "#f3f4f6", p: 1.5 }}>
       {itineraries.map((itin, index) => {
-        const isSelected = index === selectedIndex;
         const endTime = new Date(itin.endTime);
         const departureInfo = getDepartureStrings(itin.startTime);
         const price = calculateTotalFare(itin.legs);
 
         return (
-          <Card
-            key={index}
-            sx={{
-              mb: 2,
-              border: isSelected ? "2px solid #2563eb" : "none",
-              borderRadius: 2,
-            }}
-          >
+          <Card key={index} sx={{ mb: 2, borderRadius: 2 }}>
             <CardActionArea
               onClick={() => onItineraryClick(index)}
               sx={{ p: 2 }}
             >
-              {/* כותרת כרטיסייה: זמן, שעה ומחיר */}
               <Stack
                 direction="row"
                 alignItems="center"
@@ -79,7 +81,6 @@ export default function ResultsList({
                 </Stack>
               </Stack>
 
-              {/* ויזואליזציה של המקטעים (אוטובוסים/הליכה) */}
               <Stack
                 direction="row"
                 alignItems="center"
@@ -168,7 +169,6 @@ export default function ResultsList({
                 ))}
               </Stack>
 
-              {/* מידע על יציאה */}
               <Typography
                 variant="body2"
                 color="text.secondary"

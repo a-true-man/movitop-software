@@ -1,101 +1,192 @@
-const { app, BrowserWindow } = require("electron");
+const { app, BrowserWindow, ipcMain, dialog } = require("electron");
 const path = require("path");
+const fs = require("fs");
 const { spawn } = require("child_process");
 
+// משתנים גלובליים
 let mainWindow;
 let otpProcess;
-
 const isDev = !app.isPackaged;
 
-function getPaths() {
-  // בייצור: resourcesPath, בפיתוח: התיקייה הנוכחית
-  const basePath = isDev ? __dirname : process.resourcesPath;
+// --- הגדרת נתיבים חכמה (מבוסס על הקוד שלך) ---
 
-  // נתיב לג'אווה
-  let javaBinPath = "java"; // ברירת מחדל (אם מותקן במערכת)
+// 1. נתיב לקבצים המקוריים (בתוך ה-EXE/Resources) - לקריאה בלבד
+const RESOURCES_PATH = isDev ? __dirname : process.resourcesPath;
 
-  // אם אנחנו בייצור (ארוז), נחפש את הג'אווה הניידת
+// 2. נתיב לתיקיית הנתונים החיצונית (AppData) - לכתיבה וקריאה
+// כאן נשמור את הגרף כדי שנוכל להחליף אותו
+const USER_DATA_DIR = path.join(app.getPath("userData"), "otp-data");
+const WRITABLE_GRAPH_PATH = path.join(USER_DATA_DIR, "Graph.obj");
+
+// פונקציה למציאת ה-Java (מהקוד המקורי שלך)
+function getJavaPath() {
+  let javaBinPath = "java"; // ברירת מחדל
+
   if (!isDev) {
     const platform = process.platform;
     const execName = platform === "win32" ? "java.exe" : "java";
-    javaBinPath = path.join(basePath, "jre", "bin", execName);
+    javaBinPath = path.join(RESOURCES_PATH, "jre", "bin", execName);
   } else {
-    // בפיתוח: ננסה להשתמש בג'אווה מהתיקייה jre אם קיימת, אחרת מהמערכת
-    // (אופציונלי - אם ה-java הרגיל במחשב שלך עובד, זה מספיק)
-    const localJavaWin = path.join(basePath, "jre", "win", "bin", "java.exe");
-    const localJavaMac = path.join(
-      basePath,
+    // לוגיקה לפיתוח
+    const localJavaWin = path.join(
+      RESOURCES_PATH,
       "jre",
-      "mac",
-      "Contents",
-      "Home",
+      "win",
       "bin",
-      "java"
+      "java.exe"
     );
-
-    if (
-      process.platform === "win32" &&
-      require("fs").existsSync(localJavaWin)
-    ) {
+    if (process.platform === "win32" && fs.existsSync(localJavaWin)) {
       javaBinPath = localJavaWin;
-    } else if (
-      process.platform === "darwin" &&
-      require("fs").existsSync(localJavaMac)
-    ) {
-      javaBinPath = localJavaMac;
+    }
+  }
+  return javaBinPath;
+}
+
+// פונקציה להכנת הסביבה (העתקת הגרף בפעם הראשונה)
+function ensureDataExists() {
+  // 1. יצירת התיקייה
+  if (!fs.existsSync(USER_DATA_DIR)) {
+    fs.mkdirSync(USER_DATA_DIR, { recursive: true });
+  }
+
+  // 2. העתקת הגרף (Graph.obj)
+  if (!fs.existsSync(WRITABLE_GRAPH_PATH)) {
+    const bundledGraph = path.join(RESOURCES_PATH, "backend", "Graph.obj");
+    if (fs.existsSync(bundledGraph)) {
+      console.log("Copying bundled Graph.obj...");
+      fs.copyFileSync(bundledGraph, WRITABLE_GRAPH_PATH);
     }
   }
 
-  return {
-    java: javaBinPath,
-    // לפי מה שאמרת: ה-jar והגרף נמצאים ישירות ב-backend
-    otpJar: path.join(basePath, "backend", "otp.jar"),
-    graphDir: path.join(basePath, "backend"),
-  };
+  // 3. העתקת קובץ הקונפיגורציה (router-config.json) - התיקון החדש!
+  const writableConfig = path.join(USER_DATA_DIR, "router-config.json");
+  if (!fs.existsSync(writableConfig)) {
+    const bundledConfig = path.join(
+      RESOURCES_PATH,
+      "backend",
+      "router-config.json"
+    );
+
+    if (fs.existsSync(bundledConfig)) {
+      console.log("Copying bundled router-config.json...");
+      fs.copyFileSync(bundledConfig, writableConfig);
+    } else {
+      // אם אין קובץ מקור, ניצור קובץ ברירת מחדל כדי שהמשתמש יראה משהו
+      const defaultConfig = {
+        routingDefaults: {
+          walkSpeed: 1.3,
+          transferSlack: 120,
+          maxTransfers: 4,
+          waitReluctance: 0.4,
+          walkReluctance: 1.75,
+          stairsReluctance: 1.65,
+          walkBoardCost: 540,
+        },
+      };
+      fs.writeFileSync(writableConfig, JSON.stringify(defaultConfig, null, 2));
+    }
+  }
 }
 
+// --- ניהול השרת ---
+
 function startOtpServer() {
-  const paths = getPaths();
+  if (otpProcess) return;
+
+  const javaPath = getJavaPath();
+  const otpJarPath = path.join(RESOURCES_PATH, "backend", "otp.jar"); // ה-JAR נשאר במקום המקורי
+
+  // וידוא שהגרף קיים במקום שניתן לכתיבה
+  ensureDataExists();
 
   console.log("--- Starting OTP Backend ---");
-  console.log(`Java: ${paths.java}`);
-  console.log(`Jar: ${paths.otpJar}`);
-  console.log(`Graph: ${paths.graphDir}`);
+  console.log(`Java: ${javaPath}`);
+  console.log(`Jar: ${otpJarPath}`);
+  console.log(`Data Dir: ${USER_DATA_DIR}`);
 
-  // הפקודה המדויקת שעבדה לך ידנית:
-  // java -Xmx4G -jar backend/otp.jar --load backend --port 8080
+  // שים לב: אנחנו טוענים את הגרף מ-USER_DATA_DIR ולא מ-backend
   const args = [
     "-Xmx4G",
     "-jar",
-    paths.otpJar,
+    otpJarPath,
     "--load",
-    paths.graphDir,
+    USER_DATA_DIR,
     "--port",
     "8080",
   ];
 
-  otpProcess = spawn(paths.java, args);
+  otpProcess = spawn(javaPath, args);
 
-  otpProcess.stdout.on("data", (data) => {
-    // מציג את הלוגים של השרת בטרמינל של VS Code
-    console.log(`OTP: ${data}`);
-  });
+  otpProcess.stdout.on("data", (data) => console.log(`OTP: ${data}`));
+  otpProcess.stderr.on("data", (data) => console.error(`OTP Error: ${data}`));
 
-  otpProcess.stderr.on("data", (data) => {
-    console.error(`OTP Error: ${data}`);
+  otpProcess.on("close", (code) => {
+    console.log(`OTP exited with code ${code}`);
+    otpProcess = null;
   });
 }
 
+function stopOtpServer() {
+  return new Promise((resolve) => {
+    if (!otpProcess) {
+      resolve();
+      return;
+    }
+    console.log("Stopping OTP process...");
+    otpProcess.kill();
+    otpProcess = null;
+    setTimeout(resolve, 2000); // המתנה לכיבוי בטוח
+  });
+}
+
+// --- IPC Handlers (התקשורת החדשה עם ה-React) ---
+
+ipcMain.handle("dialog:select-graph", async () => {
+  const { canceled, filePaths } = await dialog.showOpenDialog({
+    properties: ["openFile"],
+    filters: [{ name: "OTP Graph", extensions: ["obj"] }],
+  });
+  if (canceled) return null;
+  return filePaths[0];
+});
+
+ipcMain.handle("app:replace-graph", async (event, newFilePath) => {
+  try {
+    console.log("Replacing Graph...");
+
+    // 1. עוצרים את השרת
+    await stopOtpServer();
+
+    // 2. דורסים את הגרף בתיקיית ה-AppData
+    fs.copyFileSync(newFilePath, WRITABLE_GRAPH_PATH);
+    console.log("Graph file replaced successfully.");
+
+    // 3. מניעים מחדש
+    startOtpServer();
+
+    return { success: true };
+  } catch (error) {
+    console.error("Replace Error:", error);
+    return { success: false, error: error.message };
+  }
+});
+
+// --- יצירת החלון ---
+
 function createWindow() {
-  startOtpServer(); // הפעלת השרת ברקע
+  // קודם כל מפעילים את השרת
+  startOtpServer();
 
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
-    title: "My Transit App",
+    title: "Movitop Pro",
     webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false,
+      // ⚠️ חשוב מאוד: שיניתי את זה כדי לתמוך ב-preload
+      // הקוד הקודם שלך השתמש ב-nodeIntegration: true וזה בעייתי אבטחתית וגם מונע שימוש ב-contextBridge
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, "preload.js"), // וודא שיש לך את הקובץ הזה ליד ה-background.js
     },
   });
 
@@ -106,23 +197,51 @@ function createWindow() {
   mainWindow.loadURL(startUrl);
 
   if (isDev) {
-    // mainWindow.webContents.openDevTools(); // פתח כלי פיתוח אם צריך
+    // mainWindow.webContents.openDevTools();
   }
 }
 
+// --- ניהול קבצי קונפיגורציה (Router Config & Map Style) ---
+
+// קריאת קובץ מתיקיית הנתונים (עבור router-config.json)
+ipcMain.handle("config:read-file", async (event, fileName) => {
+  try {
+    const targetPath = path.join(USER_DATA_DIR, fileName);
+    if (fs.existsSync(targetPath)) {
+      return fs.readFileSync(targetPath, "utf-8");
+    }
+    return null; // הקובץ לא קיים
+  } catch (e) {
+    console.error("Read Error:", e);
+    return null;
+  }
+});
+
+// כתיבת קובץ לתיקיית הנתונים
+ipcMain.handle("config:write-file", async (event, fileName, content) => {
+  try {
+    const targetPath = path.join(USER_DATA_DIR, fileName);
+    fs.writeFileSync(targetPath, content, "utf-8");
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+});
+
+// --- אירועי מערכת ---
+
 app.whenReady().then(createWindow);
 
-app.on("window-all-closed", () => {
+app.on("window-all-closed", async () => {
+  // קודם עוצרים את השרת ואז יוצאים
+  await stopOtpServer();
   if (process.platform !== "darwin") {
     app.quit();
   }
 });
 
-app.on("will-quit", () => {
-  if (otpProcess) {
-    console.log("Killing OTP process...");
-    otpProcess.kill();
-  }
+app.on("will-quit", async () => {
+  await stopOtpServer();
 });
 
 app.on("activate", () => {

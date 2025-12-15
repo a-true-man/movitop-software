@@ -1,21 +1,34 @@
-import Fuse from "fuse.js";
-// אנו מייבאים את הקובץ שיצרנו בסקריפט האוטומטי
-// וודא שהקובץ קיים בנתיב הזה (src/data/stops.json)
-import stopsDataRaw from "../data/stops.json";
+// src/services/searchService.js
 
-let stopsIndex = [];
+import Fuse from "fuse.js";
+// טעינת קובץ התחנות
+import stopsDataRaw from "../data/stops.json";
+// טעינת קובץ נקודות העניין (POIs) - וודא שהקובץ הזה קיים בתיקייה data!
+import poisDataRaw from "../data/poi.json";
+
+let searchIndex = [];
 let fuseEngine = null;
 
-// --- 1. טעינת נתונים (מהירה) ---
+// מיפוי קוד קטגוריה לשם קריא (עבור נקודות העניין)
+const categoryMap = {
+  H: "בריאות",
+  S: "קניות",
+  E: "חינוך",
+  G: "מוסד ציבורי",
+  L: "פנאי",
+  T: "תיירות",
+  O: "כללי",
+};
+
+// --- 1. טעינת נתונים (תחנות + נקודות עניין) ---
 export const loadStopsData = async () => {
-  if (stopsIndex.length > 0) return;
+  if (searchIndex.length > 0) return;
 
   try {
-    console.log("Loading stops from JSON...");
+    console.log("Loading search data (Stops + POIs)...");
 
-    // המרת הנתונים המקוצרים (Minified) למבנה נוח לעבודה
-    // הסקריפט שלנו שמר אותם כ: n=name, c=code, l=lat, o=lon, i=id
-    stopsIndex = stopsDataRaw.map((s) => ({
+    // א. עיבוד תחנות
+    const stops = stopsDataRaw.map((s) => ({
       name: s.n,
       code: s.c,
       lat: s.l,
@@ -23,69 +36,75 @@ export const loadStopsData = async () => {
       desc: s.d || "",
       id: s.i,
       type: "STOP",
+      // לתחנות אין "עיר" בפורמט הזה, אז נשאיר ריק או שנחלץ מהתיאור אם קיים
+      subText: `תחנה ${s.c}`,
+      city: "",
     }));
 
-    // הגדרת מנוע החיפוש
-    fuseEngine = new Fuse(stopsIndex, {
-      keys: ["name", "code"], // חפש לפי שם או מק"ט
-      threshold: 0.3, // גמישות בחיפוש (0 = מדויק, 1 = כל דבר)
-      limit: 20, // מקסימום תוצאות
-      distance: 100, // העדפה לתוצאות קרובות לתחילת המחרוזת
+    // ב. עיבוד נקודות עניין (POI)
+    // הנתונים החדשים: { n: name, l: lat, o: lon, c: category, a: address, ci: city }
+    const pois = poisDataRaw.map((p) => {
+      const catName = categoryMap[p.c] || "נקודת עניין";
+      const cityName = p.ci || ""; // שליפת העיר מהקובץ החדש
+
+      // יצירת תצוגה יפה: "קניות • ראשון לציון"
+      const displaySubText = cityName ? `${catName} • ${cityName}` : catName;
+
+      return {
+        name: p.n,
+        lat: p.l,
+        lon: p.o,
+        type: "POI",
+        category: p.c,
+        city: cityName, // שומרים את העיר לחיפוש
+        subText: displaySubText, // מה שיוצג מתחת לשם בתוצאות
+        address: p.a || "", // הכתובת המלאה (כולל רחוב)
+      };
     });
 
-    console.log(`Loaded ${stopsIndex.length} stops successfully.`);
+    // איחוד הרשימות לרשימה אחת גדולה
+    searchIndex = [...stops, ...pois];
+
+    // הגדרת מנוע החיפוש
+    fuseEngine = new Fuse(searchIndex, {
+      // כאן הוספנו את "city" ו-"address" כדי שהחיפוש ימצא אותם
+      keys: ["name", "code", "city", "address"],
+      threshold: 0.3,
+      limit: 20,
+      distance: 100,
+      ignoreLocation: true,
+      minMatchCharLength: 2,
+    });
+
+    console.log(
+      `Loaded ${searchIndex.length} locations (${stops.length} stops, ${pois.length} POIs).`
+    );
   } catch (error) {
-    console.error("Error parsing stops JSON:", error);
+    console.error("Error parsing data (Stops or POI json missing?):", error);
   }
 };
 
-// --- 2. חיפוש משולב (תחנות + רחובות) ---
+// --- 2. חיפוש (אופליין מלא) ---
 export const searchLocation = async (query) => {
   if (!query || query.length < 2) return [];
 
-  // א. חיפוש תחנות (אופליין - מהיר מאוד)
-  const stopResults = fuseEngine
-    ? fuseEngine.search(query).map((r) => r.item)
-    : [];
-
-  // ב. חיפוש רחובות (Nominatim - דורש אינטרנט, אבל חינמי ועובד מעולה)
-  // אם אתה רוצה 100% אופליין, תמחק את החלק הזה, אבל אז לא תוכל לחפש כתובות כמו "דיזנגוף 50"
-  let addressResults = [];
-  try {
-    // נחפש רחובות רק אם יש אינטרנט
-    if (navigator.onLine) {
-      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-        query
-      )}&countrycodes=il&limit=3`;
-      const res = await fetch(url);
-      const data = await res.json();
-
-      addressResults = data.map((item) => ({
-        name: item.display_name, // שם הכתובת המלא
-        lat: parseFloat(item.lat),
-        lon: parseFloat(item.lon),
-        type: "ADDRESS",
-        id: item.place_id,
-      }));
-    }
-  } catch (e) {
-    console.warn("Address search failed (offline?)", e);
-  }
-
-  // איחוד תוצאות: קודם כתובות, אחר כך תחנות
-  return [...addressResults, ...stopResults];
+  const results = fuseEngine ? fuseEngine.search(query).map((r) => r.item) : [];
+  return results;
 };
 
 // --- 3. יצירת GeoJSON למפה ---
 let cachedGeoJson = null;
 
 export const getStopsGeoJson = () => {
-  if (stopsIndex.length === 0) return null;
+  if (searchIndex.length === 0) return null;
   if (cachedGeoJson) return cachedGeoJson;
+
+  // מציגים רק תחנות על המפה כברירת מחדל
+  const onlyStops = searchIndex.filter((item) => item.type === "STOP");
 
   cachedGeoJson = {
     type: "FeatureCollection",
-    features: stopsIndex.map((stop) => ({
+    features: onlyStops.map((stop) => ({
       type: "Feature",
       geometry: { type: "Point", coordinates: [stop.lon, stop.lat] },
       properties: { name: stop.name, code: stop.code, id: stop.id },
@@ -109,7 +128,6 @@ export const getFavorites = () => {
 
 export const addFavorite = (location) => {
   const favs = getFavorites();
-  // מניעת כפילויות
   if (favs.find((f) => f.name === location.name)) return favs;
 
   const newFavs = [...favs, { ...location, type: "FAVORITE" }];
