@@ -45,7 +45,7 @@ npm install
 
 ### 2\. הגדרת Java (חובה\!)
 
-כדי לשמור על הפרויקט קליל, לא העלינו את הג'אווה לגיט. יש להוסיף אותה ידנית:
+כדי לשמור על הפרויקט קליל, לא העלינו את הג'אווה והפונטים לגיט. יש להוסיף אותה ידנית:
 
 1.  הורד את **Java 21 JRE (Portable)** מאתר [Adoptium](https://www.google.com/search?q=https://adoptium.net/temurin/releases/%3Fversion%3D21%26package%3Djre). \* **Windows:** הורד `.zip`
     | **Mac:** הורד `.tar.gz`.
@@ -56,6 +56,12 @@ npm install
 > **Windows:** `movitop-software/jre/win`
 >
 > **Mac:** `movitop-software/jre/mac`
+
+2/2. הגדרת פונטים (חובה!)
+יש להוריד את ספרית הפונטים Noto של גוגל ולהניח את שלושת התיקיות
+Noto Sans Bold.. Noto Sans Italic., Noto Sans Regular
+בנתיב בתיקיית fonts בתוך ה public
+
 
 ### 3\. הגדרת מפות (אופציונלי)
 
