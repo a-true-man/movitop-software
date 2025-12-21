@@ -145,7 +145,6 @@ export default function SettingsDialog({ open, onClose }) {
   };
 
   const handleGraphReplace = async () => {
-    // ✅ התיקון: החזרת הבדיקה וההודעה לדפדפן
     if (!window.electronAPI) {
       alert(
         "פעולה זו זמינה רק בגרסת הדסקטופ המותקנת, מכיוון שהדפדפן אינו רשאי לגשת לקבצי המערכת."
@@ -161,6 +160,34 @@ export default function SettingsDialog({ open, onClose }) {
       await window.electronAPI.replaceGraphAndRestart(filePath);
       setIsReplacing(false);
       alert("הגרף הוחלף בהצלחה.");
+    }
+  };
+
+  // --- פונקציה חדשה לטיפול חכם בבחירת מפה (תיקון ה-Persistence) ---
+  const handleMapSelection = async (event) => {
+    // 1. נתיב לתוכנה (Electron) - שמירה קבועה
+    if (window.electronAPI) {
+      const filePath = await window.electronAPI.selectMapFile();
+      if (!filePath) return;
+
+      // המרה לנתיב URL תקין (חשוב מאוד!)
+      const fileUrl = "file:///" + filePath.replace(/\\/g, "/");
+      const finalUrl = `pmtiles://${fileUrl}`;
+
+      // שמירה ישירה להגדרות
+      saveSettings({
+        ...settings,
+        tilesUrl: finalUrl,
+      });
+
+      alert("המפה נטענה בהצלחה ותישמר להפעלה הבאה.");
+    }
+    // 2. נתיב לדפדפן - שמירה זמנית
+    else {
+      const file = event.target.files[0];
+      if (file) {
+        handleMapFileSelect(file);
+      }
     }
   };
 
@@ -249,8 +276,8 @@ export default function SettingsDialog({ open, onClose }) {
                 value={styleJsonString}
                 onChange={(e) => setStyleJsonString(e.target.value)}
                 sx={{
-                  direction: "ltr",
-                  textAlign: "left",
+                  direction: "ltr", // Fix: LTR Text
+                  textAlign: "left", // Fix: Align Left
                   fontFamily: "monospace",
                   "& .MuiInputBase-root": {
                     fontFamily: "Consolas, monospace",
@@ -294,8 +321,8 @@ export default function SettingsDialog({ open, onClose }) {
                     value={routerConfigString}
                     onChange={(e) => setRouterConfigString(e.target.value)}
                     sx={{
-                      direction: "ltr",
-                      textAlign: "left",
+                      direction: "ltr", // Fix: LTR Text
+                      textAlign: "left", // Fix: Align Left
                       fontFamily: "monospace",
                       "& .MuiInputBase-root": {
                         fontFamily: "Consolas, monospace",
@@ -355,17 +382,23 @@ export default function SettingsDialog({ open, onClose }) {
                     component="label"
                     startIcon={<UploadFileIcon />}
                     sx={{ mt: 1 }}
+                    // שינוי לטיפול בבחירה מותאמת ל-Electron
+                    onClick={(e) => {
+                      if (window.electronAPI) {
+                        e.preventDefault();
+                        handleMapSelection();
+                      }
+                    }}
                   >
                     טען קובץ מפה
-                    <input
-                      type="file"
-                      hidden
-                      accept=".pmtiles"
-                      onChange={(e) =>
-                        e.target.files[0] &&
-                        handleMapFileSelect(e.target.files[0])
-                      }
-                    />
+                    {!window.electronAPI && (
+                      <input
+                        type="file"
+                        hidden
+                        accept=".pmtiles"
+                        onChange={handleMapSelection}
+                      />
+                    )}
                   </Button>
                 </Box>
               </Stack>
