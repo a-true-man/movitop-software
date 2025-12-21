@@ -150,6 +150,16 @@ ipcMain.handle("dialog:select-graph", async () => {
   return filePaths[0];
 });
 
+// בחירת קובץ מפה (PMTiles)
+ipcMain.handle("dialog:select-map-file", async () => {
+  const { canceled, filePaths } = await dialog.showOpenDialog({
+    properties: ["openFile"],
+    filters: [{ name: "PMTiles Map", extensions: ["pmtiles"] }],
+  });
+  if (canceled) return null;
+  return filePaths[0]; // מחזיר את הנתיב המלא: C:\Users\...\israel.pmtiles
+});
+
 ipcMain.handle("app:replace-graph", async (event, newFilePath) => {
   try {
     console.log("Replacing Graph...");
