@@ -13,7 +13,6 @@ import CloseIcon from "@mui/icons-material/Close";
 import DirectionsBusIcon from "@mui/icons-material/DirectionsBus";
 import TramIcon from "@mui/icons-material/Tram";
 import TrainIcon from "@mui/icons-material/Train";
-import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import { motion, AnimatePresence } from "framer-motion";
 import { request, gql } from "graphql-request";
 
@@ -185,7 +184,9 @@ export default function StationDialog({ open, onClose, stop }) {
           setGroupedSchedule(sortedGroups);
         }
       } catch (e) {
-        console.error(e);
+        if (process.env.NODE_ENV !== "production") {
+          console.error("Station fetch error:", e);
+        }
       }
       setLoading(false);
     };

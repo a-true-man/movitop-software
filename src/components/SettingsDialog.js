@@ -60,6 +60,7 @@ export default function SettingsDialog({ open, onClose }) {
     if (open) {
       loadCurrentData();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const loadCurrentData = async () => {
@@ -145,49 +146,61 @@ export default function SettingsDialog({ open, onClose }) {
   };
 
   const handleGraphReplace = async () => {
-    if (!window.electronAPI) {
+    if (typeof window === "undefined" || !window.electronAPI?.selectGraphFile) {
       alert(
         "פעולה זו זמינה רק בגרסת הדסקטופ המותקנת, מכיוון שהדפדפן אינו רשאי לגשת לקבצי המערכת."
       );
       return;
     }
 
-    const filePath = await window.electronAPI.selectGraphFile();
-    if (!filePath) return;
+    try {
+      const filePath = await window.electronAPI.selectGraphFile();
+      if (!filePath) return;
 
-    if (window.confirm("האם להחליף את הגרף? השרת יופעל מחדש.")) {
-      setIsReplacing(true);
-      await window.electronAPI.replaceGraphAndRestart(filePath);
+      if (window.confirm("האם להחליף את הגרף? השרת יופעל מחדש.")) {
+        setIsReplacing(true);
+        await window.electronAPI.replaceGraphAndRestart(filePath);
+        setIsReplacing(false);
+        alert("הגרף הוחלף בהצלחה.");
+      }
+    } catch (err) {
+      console.error("Graph replace error:", err);
+      alert("שגיאה בהחלפת הגרף: " + (err?.message || String(err)));
+    } finally {
       setIsReplacing(false);
-      alert("הגרף הוחלף בהצלחה.");
     }
   };
 
-  // --- פונקציה חדשה לטיפול חכם בבחירת מפה (תיקון ה-Persistence) ---
+  // --- פונקציה לטיפול בבחירת מפה (Electron + דפדפן) ---
   const handleMapSelection = async (event) => {
-    // 1. נתיב לתוכנה (Electron) - שמירה קבועה
-    if (window.electronAPI) {
-      const filePath = await window.electronAPI.selectMapFile();
-      if (!filePath) return;
+    // 1. Electron - בחירה דרך ה-dialog
+    if (typeof window !== "undefined" && window.electronAPI?.selectMapFile) {
+      try {
+        const filePath = await window.electronAPI.selectMapFile();
+        if (!filePath) return;
 
-      // המרה לנתיב URL תקין (חשוב מאוד!)
-      const fileUrl = "file:///" + filePath.replace(/\\/g, "/");
-      const finalUrl = `pmtiles://${fileUrl}`;
+        // המרה לנתיב URL תקין (תואם Windows + macOS/Linux)
+        const normalized = filePath.replace(/\\/g, "/");
+        const fileUrl = normalized.startsWith("/") ? `file://${normalized}` : `file:///${normalized}`;
+        const finalUrl = `pmtiles://${fileUrl}`;
 
-      // שמירה ישירה להגדרות
-      saveSettings({
-        ...settings,
-        tilesUrl: finalUrl,
-      });
+        saveSettings({
+          ...settings,
+          tilesUrl: finalUrl,
+        });
 
-      alert("המפה נטענה בהצלחה ותישמר להפעלה הבאה.");
-    }
-    // 2. נתיב לדפדפן - שמירה זמנית
-    else {
-      const file = event.target.files[0];
-      if (file) {
-        handleMapFileSelect(file);
+        alert("המפה נטענה בהצלחה ותישמר להפעלה הבאה.");
+      } catch (err) {
+        console.error("Map selection error:", err);
+        alert("שגיאה בבחירת קובץ: " + (err?.message || String(err)));
       }
+      return;
+    }
+
+    // 2. דפדפן - input type=file
+    const file = event?.target?.files?.[0];
+    if (file) {
+      handleMapFileSelect(file);
     }
   };
 
@@ -382,20 +395,20 @@ export default function SettingsDialog({ open, onClose }) {
                     component="label"
                     startIcon={<UploadFileIcon />}
                     sx={{ mt: 1 }}
-                    // שינוי לטיפול בבחירה מותאמת ל-Electron
                     onClick={(e) => {
-                      if (window.electronAPI) {
+                      if (typeof window !== "undefined" && window.electronAPI?.selectMapFile) {
                         e.preventDefault();
+                        e.stopPropagation();
                         handleMapSelection();
                       }
                     }}
                   >
                     טען קובץ מפה
-                    {!window.electronAPI && (
+                    {!(typeof window !== "undefined" && window.electronAPI?.selectMapFile) && (
                       <input
                         type="file"
                         hidden
-                        accept=".pmtiles"
+                        accept=".pmtiles,*.pmtiles"
                         onChange={handleMapSelection}
                       />
                     )}

@@ -1,5 +1,3 @@
-import polyline from "@mapbox/polyline";
-
 // --- מנוע חישוב מרחקים ---
 const deg2rad = (deg) => deg * (Math.PI / 180);
 

@@ -4,6 +4,7 @@ node_modules/
 # תוצרי בנייה (React & Electron)
 build/
 dist/
+dist-mac/
 
 # קבצי מערכת
 .DS_Store
@@ -23,8 +24,11 @@ jre/
 # קובץ המפה הוא ענק. עדיף לתת לינק להורדה ב-README או להשתמש ב-Git LFS
 public/israel.pmtiles
 
-# קבצי סביבה ומפתחות (אם יש)
+# קבצי סביבה – רק קבצים שעלולים להכיל סודות
+# .env.production מוּעד לפריסה – כולל רק הגדרות build (ללא מפתחות)
 .env
 .env.local
+.env.development.local
+.env.test.local
 public/*.mbtiles
 public/*.pmtiles

@@ -4,8 +4,8 @@
   "private": true,
   "main": "background.js",
   "homepage": "./",
-  "description": "Transit desktop app",
-  "author": "Your Name",
+  "description": "מוביטופ - אפליקציית ניווט תחבורה ציבורית",
+  "author": "איש אמת",
   "dependencies": {
     "@emotion/react": "^11.11.0",
     "@emotion/styled": "^11.11.0",
@@ -71,17 +71,21 @@
   },
   "build": {
     "appId": "com.mytrmovitop.app",
-    "productName": "movitop-software",
+    "productName": "מוביטופ",
     "files": [
       "build/**/*",
       "background.js",
+      "preload.js"
+    ],
+    "asarUnpack": [
       "preload.js"
     ],
     "extraMetadata": {
       "main": "background.js"
     },
     "mac": {
-      "target": "dmg",
+      "target": ["dmg", "pkg"],
+      "category": "public.app-category.navigation",
       "extraResources": [
         {
           "from": "backend/",
@@ -95,6 +99,12 @@
         {
           "from": "jre/mac/Contents/Home",
           "to": "jre"
+        }
+      ],
+      "extraFiles": [
+        {
+          "from": "build-resources/הסרת מוביטופ.command",
+          "to": "הסרת מוביטופ.command"
         }
       ]
     },

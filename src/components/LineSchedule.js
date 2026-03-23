@@ -12,7 +12,6 @@ import {
   CircularProgress,
   Collapse,
   Button,
-  Grid,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -26,7 +25,6 @@ import CloseIcon from "@mui/icons-material/Close";
 import CircleIcon from "@mui/icons-material/Circle";
 import ExpandLess from "@mui/icons-material/ExpandLess";
 import ExpandMore from "@mui/icons-material/ExpandMore";
-import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import SwapVertIcon from "@mui/icons-material/SwapVert";
 import DirectionsBusIcon from "@mui/icons-material/DirectionsBus";
 import ScheduleIcon from "@mui/icons-material/Schedule";
@@ -286,6 +284,17 @@ export default function LineSchedule({ selectedLine, onClose }) {
                 borderBottom: "1px solid #e0e0e0",
               }}
             >
+              <Typography
+                variant="caption"
+                sx={{
+                  display: "block",
+                  mb: 0.5,
+                  color: "text.secondary",
+                  fontWeight: 600,
+                }}
+              >
+                כיוון הקו
+              </Typography>
               <FormControl
                 fullWidth
                 size="small"
@@ -306,18 +315,27 @@ export default function LineSchedule({ selectedLine, onClose }) {
                     "& .MuiSelect-icon": { left: 7, right: "auto" },
                   }}
                 >
-                  {availablePatterns.map((p) => (
-                    <MenuItem
-                      key={p.id}
-                      value={p.id}
-                      sx={{ direction: "rtl", justifyContent: "flex-start" }}
-                    >
-                      <SwapVertIcon
-                        sx={{ ml: 1, fontSize: 18, color: "text.secondary" }}
-                      />
-                      {p.headsign || `מסלול ${p.id}`}
-                    </MenuItem>
-                  ))}
+                  {availablePatterns.map((p, idx) => {
+                    const routeLongName =
+                      selectedLine.routeIdToLongName?.[p.routeId];
+                    const directionLabel =
+                      p.headsign ||
+                      p.name ||
+                      routeLongName ||
+                      `כיוון ${idx + 1}`;
+                    return (
+                      <MenuItem
+                        key={p.id}
+                        value={p.id}
+                        sx={{ direction: "rtl", justifyContent: "flex-start" }}
+                      >
+                        <SwapVertIcon
+                          sx={{ ml: 1, fontSize: 18, color: "text.secondary" }}
+                        />
+                        {directionLabel}
+                      </MenuItem>
+                    );
+                  })}
                 </Select>
               </FormControl>
             </Box>

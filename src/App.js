@@ -8,7 +8,7 @@ import Map, {
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { Protocol } from "pmtiles";
-import { Paper, ThemeProvider, createTheme, Box } from "@mui/material";
+import { Paper, ThemeProvider, createTheme, Box, CircularProgress, Typography } from "@mui/material";
 import { request, gql } from "graphql-request";
 import polyline from "@mapbox/polyline";
 
@@ -34,14 +34,35 @@ import LineSchedule from "./components/LineSchedule"; // <--- ייבוא חדש
 
 // Imports - Contexts & Icons
 import { SettingsProvider, useSettings } from "./contexts/SettingsContext";
+import { waitForOtp } from "./services/otpHealthService";
 
-// --- פונקציית עזר להזרקת ה-Source URL לתוך ה-Style JSON ---
+// --- פונקציית עזר להזרקת URLs ל-Style (MapLibre דורש URLs מוחלטים) ---
+const getBaseUrl = () => {
+  if (typeof window === "undefined") return "";
+  try {
+    return new URL(".", window.location.href).href;
+  } catch {
+    return window.location.origin + "/";
+  }
+};
+
 const injectSourceIntoStyle = (styleJson, tilesUrl) => {
   if (!styleJson || !tilesUrl) return styleJson;
   const newStyle = JSON.parse(JSON.stringify(styleJson));
-  if (newStyle.sources && newStyle.sources.protomaps) {
+  const base = getBaseUrl();
+
+  if (newStyle.sources?.protomaps) {
     newStyle.sources.protomaps.url = tilesUrl;
   }
+  // MapLibre דורש sprite ב-URL מוחלט
+  if (newStyle.sprite && base) {
+    newStyle.sprite = base + "map/sprites/sprite";
+  }
+  // glyphs - URL מוחלט (שומר על הפורמט {fontstack}/{range})
+  if (newStyle.glyphs && base) {
+    newStyle.glyphs = base + "fonts/{fontstack}/{range}.pbf";
+  }
+
   return newStyle;
 };
 
@@ -112,6 +133,23 @@ function AppContent() {
   // --- State חדש לניהול לוח זמנים של קו ---
   const [selectedLineForSchedule, setSelectedLineForSchedule] = useState(null);
 
+  // --- State לבדיקת זמינות OTP (ב-Electron) ---
+  const [otpReady, setOtpReady] = useState(false);
+  const isElectron = typeof window !== "undefined" && window.electronAPI?.isElectron;
+
+  // --- המתנה ל-OTP כאשר רצים ב-Electron ---
+  useEffect(() => {
+    if (!isElectron) {
+      setOtpReady(true);
+      return;
+    }
+    let cancelled = false;
+    waitForOtp(settings.otpUrl).then(() => {
+      if (!cancelled) setOtpReady(true);
+    });
+    return () => { cancelled = true; };
+  }, [isElectron, settings.otpUrl]);
+
   // --- טעינת נתונים ראשונית ---
   useEffect(() => {
     const protocol = new Protocol();
@@ -123,7 +161,9 @@ function AppContent() {
       maplibregl.setRTLTextPlugin(
         "/mapbox-gl-rtl-text.min.js",
         (error) => {
-          if (error) console.error("RTL Plugin Failed:", error);
+          if (error && process.env.NODE_ENV !== "production") {
+            console.error("RTL Plugin Failed:", error);
+          }
         },
         true
       );
@@ -152,7 +192,9 @@ function AppContent() {
           setBaseStyle(json);
         }
       } catch (e) {
-        console.error("Failed to load map style", e);
+        if (process.env.NODE_ENV !== "production") {
+          console.error("Failed to load map style", e);
+        }
       }
     };
     if (settings.mapStylePath || settings.customMapStyle) {
@@ -272,7 +314,9 @@ function AppContent() {
       const data = await request(settings.otpUrl, query);
       if (data.plan?.itineraries) setItineraries(data.plan.itineraries);
     } catch (error) {
-      console.error("OTP Error:", error);
+      if (process.env.NODE_ENV !== "production") {
+        console.error("OTP Error:", error);
+      }
       alert("שגיאה בתקשורת עם שרת הניווט.");
     }
     setLoading(false);
@@ -405,12 +449,41 @@ function AppContent() {
       <Box
         sx={{
           display: "flex",
+          flexDirection: "column",
           justifyContent: "center",
           alignItems: "center",
           height: "100vh",
+          gap: 2,
         }}
       >
-        <div>Loading Application...</div>
+        <CircularProgress size={48} />
+        <Typography variant="body1" color="text.secondary">
+          טוען את מוביטופ...
+        </Typography>
+      </Box>
+    );
+  }
+
+  if (isElectron && !otpReady) {
+    return (
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          alignItems: "center",
+          height: "100vh",
+          gap: 2,
+          bgcolor: "background.default",
+        }}
+      >
+        <CircularProgress size={56} sx={{ color: "primary.main" }} />
+        <Typography variant="h6" color="text.primary">
+          ממתין לשרת הניווט...
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          טוען את נתוני התחבורה, ייתכן שייקח דקה
+        </Typography>
       </Box>
     );
   }

@@ -25,8 +25,6 @@ export const loadStopsData = async () => {
   if (searchIndex.length > 0) return;
 
   try {
-    console.log("Loading search data (Stops + POIs)...");
-
     // א. עיבוד תחנות
     const stops = stopsDataRaw.map((s) => ({
       name: s.n,
@@ -76,20 +74,27 @@ export const loadStopsData = async () => {
       minMatchCharLength: 2,
     });
 
-    console.log(
-      `Loaded ${searchIndex.length} locations (${stops.length} stops, ${pois.length} POIs).`
-    );
   } catch (error) {
-    console.error("Error parsing data (Stops or POI json missing?):", error);
+    if (process.env.NODE_ENV !== "production") {
+      console.error("Error parsing data (Stops or POI json missing?):", error);
+    }
   }
 };
 
 // --- 2. חיפוש (אופליין מלא) ---
+// מחכה לטעינת הנתונים ומבצע חיפוש (עם yield ל-main thread למניעת חסימה)
 export const searchLocation = async (query) => {
-  if (!query || query.length < 2) return [];
+  if (!query || typeof query !== "string" || query.trim().length < 2) return [];
 
-  const results = fuseEngine ? fuseEngine.search(query).map((r) => r.item) : [];
-  return results;
+  await loadStopsData();
+  if (!fuseEngine) return [];
+
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => {
+      const results = fuseEngine.search(query.trim()).map((r) => r.item);
+      resolve(results);
+    });
+  });
 };
 
 // --- 3. יצירת GeoJSON למפה ---

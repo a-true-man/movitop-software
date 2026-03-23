@@ -9,7 +9,7 @@ const defaultSettings = {
   otpUrl: "http://localhost:8080/otp/routers/default/index/graphql",
   // אלו הגדרות למצב שבו הקבצים יושבים בתיקיית Public (ברירת מחדל)
   mapStylePath: "/map_style.json",
-  tilesUrl: "pmtiles:///israel.pmtiles", // ה-URL שיוזרק לתוך ה-Style
+  tilesUrl: "pmtiles://israel.pmtiles", // נתיב יחסי - עובד ב-dev וב-Electron
   customMapStyle: null,
 };
 

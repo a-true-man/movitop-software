@@ -1,5 +1,6 @@
 const { app, BrowserWindow, ipcMain, dialog } = require("electron");
 const path = require("path");
+const { pathToFileURL } = require("url");
 const fs = require("fs");
 const { spawn } = require("child_process");
 
@@ -187,22 +188,24 @@ function createWindow() {
   // קודם כל מפעילים את השרת
   startOtpServer();
 
+  const preloadPath = isDev
+    ? path.join(__dirname, "preload.js")
+    : path.join(process.resourcesPath, "app.asar.unpacked", "preload.js");
+
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
-    title: "Movitop Pro",
+    title: "מוביטופ - ניווט תחבורה ציבורית",
     webPreferences: {
-      // ⚠️ חשוב מאוד: שיניתי את זה כדי לתמוך ב-preload
-      // הקוד הקודם שלך השתמש ב-nodeIntegration: true וזה בעייתי אבטחתית וגם מונע שימוש ב-contextBridge
       nodeIntegration: false,
       contextIsolation: true,
-      preload: path.join(__dirname, "preload.js"), // וודא שיש לך את הקובץ הזה ליד ה-background.js
+      preload: preloadPath,
     },
   });
 
   const startUrl = isDev
     ? "http://localhost:3000"
-    : `file://${path.join(__dirname, "build/index.html")}`;
+    : pathToFileURL(path.join(__dirname, "build/index.html")).toString();
 
   mainWindow.loadURL(startUrl);
 

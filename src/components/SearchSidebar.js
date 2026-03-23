@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useDeferredValue } from "react";
+import React, { useState, useEffect, useMemo, useRef, useDeferredValue } from "react";
 import {
   Box,
   Typography,
@@ -175,6 +175,10 @@ export default function SearchSidebar({
   const deferredFromInput = useDeferredValue(localFromInput);
   const deferredToInput = useDeferredValue(localToInput);
 
+  const debounceFromRef = useRef(null);
+  const debounceToRef = useRef(null);
+  const DEBOUNCE_MS = 220;
+
   // סנכרון התחלתי (למקרה שהערך מגיע מבחוץ, למשל מלחיצה על מועדפים)
   useEffect(() => {
     setLocalFromInput(fromInputValue || "");
@@ -183,35 +187,71 @@ export default function SearchSidebar({
     setLocalToInput(toInputValue || "");
   }, [toInputValue]);
 
-  // --- אפקט החיפוש הכבד (From) ---
-  // ירוץ רק כשהמשתמש מפסיק להקליד לרגע והערך המושהה מתעדכן
+  // --- אפקט החיפוש (From) עם דיבונס ---
   useEffect(() => {
-    // קריאה לפונקציית החיפוש המקורית (של ההורה)
-    // אנחנו מעבירים את הערך המושהה כדי לבצע את החיפוש בפועל
-    if (deferredFromInput !== fromInputValue) {
-      // מונע לופים מיותרים
+    if (deferredFromInput === undefined || deferredFromInput === null) return;
+
+    const runSearch = () => {
       onInputChange(
         deferredFromInput,
         setFromOptions,
         setFromInputValue,
         fromLoc,
-        setFromLoc
+        setFromLoc,
+        "from"
       );
+    };
+
+    if (!deferredFromInput.trim()) {
+      onInputChange(
+        "",
+        setFromOptions,
+        setFromInputValue,
+        fromLoc,
+        setFromLoc,
+        "from"
+      );
+      return;
     }
+
+    debounceFromRef.current = setTimeout(runSearch, DEBOUNCE_MS);
+    return () => {
+      if (debounceFromRef.current) clearTimeout(debounceFromRef.current);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deferredFromInput]);
 
-  // --- אפקט החיפוש הכבד (To) ---
+  // --- אפקט החיפוש (To) עם דיבונס ---
   useEffect(() => {
-    if (deferredToInput !== toInputValue) {
+    if (deferredToInput === undefined || deferredToInput === null) return;
+
+    const runSearch = () => {
       onInputChange(
         deferredToInput,
         setToOptions,
         setToInputValue,
         toLoc,
-        setToLoc
+        setToLoc,
+        "to"
       );
+    };
+
+    if (!deferredToInput.trim()) {
+      onInputChange(
+        "",
+        setToOptions,
+        setToInputValue,
+        toLoc,
+        setToLoc,
+        "to"
+      );
+      return;
     }
+
+    debounceToRef.current = setTimeout(runSearch, DEBOUNCE_MS);
+    return () => {
+      if (debounceToRef.current) clearTimeout(debounceToRef.current);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deferredToInput]);
 
@@ -237,23 +277,37 @@ export default function SearchSidebar({
     }
   }, [activeTab, allLines.length]);
 
-  // איחוד קווים (כבד) - רץ פעם אחת
+  // איחוד קווים לפי מספר קו יחיד - הלוך וחזור מתאחדים לקו אחד
+  // אחרי בחירת הקו, המשתמש בוחר כיוון ב-LineSchedule
   const uniqueLines = useMemo(() => {
     if (allLines.length === 0) return [];
     const groupedMap = new Map();
     for (let i = 0; i < allLines.length; i++) {
       const line = allLines[i];
-      const normalizedName = normalizeRouteName(line.longName);
-      const uniqueKey = `${line.shortName}-${line.agencyName}-${normalizedName}`;
+      const agencyName = line.agencyName || line.agency?.name || "";
+      // מפתח: מספר קו + חברה בלבד - כך שכל הכיוונים (הלוך וחזור) מאוחדים
+      const uniqueKey = `${line.shortName || ""}|${agencyName}`;
 
       if (!groupedMap.has(uniqueKey)) {
+        const normalizedName = normalizeRouteName(line.longName);
+        const routeIdToLongName = { [line.id]: line.longName || "" };
         groupedMap.set(uniqueKey, {
           ...line,
-          normalizedName: normalizedName,
+          id: line.id, // שמירת id ראשון למפתח רינדור
+          uniqueKey, // מפתח יציב לרשימה
+          normalizedName,
           allIds: [line.id],
+          routeIdToLongName, // מיפוי routeId -> longName לזיהוי כיוון
         });
       } else {
-        groupedMap.get(uniqueKey).allIds.push(line.id);
+        const existing = groupedMap.get(uniqueKey);
+        existing.allIds.push(line.id);
+        existing.routeIdToLongName[line.id] = line.longName || "";
+        // עדכון normalizedName מהתיאור המפורט ביותר (אם יש כיוונים שונים)
+        const currentNorm = normalizeRouteName(line.longName);
+        if (currentNorm && currentNorm !== existing.normalizedName) {
+          existing.normalizedName = existing.normalizedName || currentNorm;
+        }
       }
     }
     return Array.from(groupedMap.values());
@@ -756,7 +810,7 @@ export default function SearchSidebar({
                   const agencyColor = getAgencyColor(line.agencyName);
                   return (
                     <Paper
-                      key={line.id}
+                      key={line.uniqueKey || line.id}
                       elevation={0}
                       onClick={() => handleLineClick(line)}
                       sx={{
@@ -825,7 +879,7 @@ export default function SearchSidebar({
                         </Typography>
                         {line.allIds.length > 1 && (
                           <Chip
-                            label="מסלול דו-כיווני"
+                            label={`${line.allIds.length} כיוונים - בחר כיוון`}
                             size="small"
                             sx={{ mt: 0.5, height: 20, fontSize: "0.65rem" }}
                           />

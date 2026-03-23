@@ -86,7 +86,34 @@ if os.path.exists(stops_file):
     print(f"Stops fixed (location_type 1->0): {stops_fixed}")
 
 # ==========================================
-# 3. אריזה מחדש
+# תיקון 3: קובץ סוכנויות (agency.txt) - agency_url חובה
+# ==========================================
+agency_file = os.path.join(extract_dir, "agency.txt")
+temp_agency = os.path.join(extract_dir, "agency_temp.txt")
+agency_fixed = 0
+
+if os.path.exists(agency_file):
+    with open(agency_file, 'r', encoding='utf-8-sig') as infile, \
+         open(temp_agency, 'w', encoding='utf-8', newline='') as outfile:
+        
+        reader = csv.DictReader(infile)
+        reader.fieldnames = [f.strip() for f in reader.fieldnames]
+        writer = csv.DictWriter(outfile, fieldnames=reader.fieldnames)
+        writer.writeheader()
+
+        for row in reader:
+            url = row.get('agency_url', '').strip()
+            if not url:
+                row['agency_url'] = 'https://www.gov.il'
+                agency_fixed += 1
+            writer.writerow(row)
+    
+    os.replace(temp_agency, agency_file)
+    if agency_fixed:
+        print(f"Agency fixed (missing agency_url): {agency_fixed}")
+
+# ==========================================
+# 4. אריזה מחדש
 # ==========================================
 if os.path.exists(zip_path):
     os.remove(zip_path)
@@ -99,4 +126,4 @@ with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
             zipf.write(file_path, arcname)
 
 shutil.rmtree(extract_dir)
-print("\nSUCCESS: gtfs.zip is fully patched (Routes + Stops).")
+print("\nSUCCESS: gtfs.zip is fully patched (Routes + Stops + Agency).")

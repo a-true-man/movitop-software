@@ -176,10 +176,6 @@ export const fetchStopSchedule = async (stopId, date, routeShortName) => {
     `;
 
   try {
-    console.log(
-      `🔍 Seeking schedule for Stop: ${stopId}, Date: ${formattedDate}, Route: ${routeShortName}`
-    );
-
     const response = await fetch(GRAPHQL_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -192,7 +188,9 @@ export const fetchStopSchedule = async (stopId, date, routeShortName) => {
     const json = await response.json();
 
     if (json.errors) {
-      console.error("❌ GraphQL Errors:", json.errors);
+      if (process.env.NODE_ENV !== "production") {
+        console.error("GraphQL Errors:", json.errors);
+      }
       return [];
     }
     if (
@@ -200,7 +198,6 @@ export const fetchStopSchedule = async (stopId, date, routeShortName) => {
       !json.data.stop ||
       !json.data.stop.stoptimesForServiceDate
     ) {
-      console.warn("⚠️ Stop not found or no data returned");
       return [];
     }
 
@@ -216,10 +213,6 @@ export const fetchStopSchedule = async (stopId, date, routeShortName) => {
       }
     });
 
-    console.log(
-      `📊 Found ${allStopTimes.length} total stop times (flattened) at this station.`
-    );
-
     // --- סינון לפי מספר קו ---
     const filteredTimes = allStopTimes.filter((st) => {
       const serverName = String(st.trip.route.shortName || "").trim();
@@ -227,12 +220,12 @@ export const fetchStopSchedule = async (stopId, date, routeShortName) => {
       return serverName === targetName;
     });
 
-    console.log(`✅ Filtered matches: ${filteredTimes.length}`);
-
     // מחזירים רק את הזמנים, ממוינים
     return filteredTimes.map((st) => st.scheduledArrival).sort((a, b) => a - b);
   } catch (error) {
-    console.error("🔥 Error in fetchStopSchedule:", error);
+    if (process.env.NODE_ENV !== "production") {
+      console.error("Error in fetchStopSchedule:", error);
+    }
     return [];
   }
 };

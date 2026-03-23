@@ -5,6 +5,10 @@ import GitHubIcon from "@mui/icons-material/GitHub";
 
 // מקבלים את הפונקציה onOpenSettings כ-prop
 export default function Footer({ onOpenSettings }) {
+  const handleComingSoon = (e) => {
+    e.preventDefault();
+    alert("בקרוב");
+  };
   return (
     <Box
       sx={{
@@ -58,17 +62,20 @@ export default function Footer({ onOpenSettings }) {
           הדרכה
         </Link>
         <Link
+          component="button"
           href="#"
+          onClick={handleComingSoon}
           underline="hover"
           color="text.secondary"
           variant="caption"
+          sx={{ cursor: "pointer", background: "none", border: "none", font: "inherit" }}
         >
           מדיניות פרטיות
         </Link>
         <Link
-          href="https://mitmachim.top/topic/90912/%D7%9E%D7%95%D7%91%D7%99%D7%98%D7%95%D7%A4-%D7%96%D7%9E%D7%A0%D7%99-%D7%AA%D7%97%D7%91%D7%95%D7%A8%D7%94-%D7%90%D7%95%D7%A4%D7%9C%D7%99%D7%9F-%D7%94%D7%AA%D7%95%D7%9B%D7%A0%D7%94-%D7%91%D7%A4%D7%99%D7%AA%D7%95%D7%97" // החלף את ה-# בכתובת אמיתית
-          target="_blank" // זה מה שפותח בדפדפן חדש
-          rel="noopener noreferrer" // מומלץ תמיד בשימוש עם target="_blank"
+          href="https://mitmachim.top/topic/90912/%D7%9E%D7%95%D7%91%D7%99%D7%98%D7%95%D7%A4-%D7%96%D7%9E%D7%A0%D7%99-%D7%AA%D7%97%D7%91%D7%95%D7%A8%D7%94-%D7%90%D7%95%D7%A4%D7%9C%D7%99%D7%9F-%D7%94%D7%AA%D7%95%D7%9B%D7%A0%D7%94-%D7%91%D7%A4%D7%99%D7%AA%D7%95%D7%97"
+          target="_blank"
+          rel="noopener noreferrer"
           underline="hover"
           color="text.secondary"
           variant="caption"
@@ -76,10 +83,13 @@ export default function Footer({ onOpenSettings }) {
           צור קשר
         </Link>
         <Link
+          component="button"
           href="#"
+          onClick={handleComingSoon}
           underline="hover"
           color="text.secondary"
           variant="caption"
+          sx={{ cursor: "pointer", background: "none", border: "none", font: "inherit" }}
         >
           הצהרת נגישות
         </Link>

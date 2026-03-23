@@ -1,6 +1,6 @@
 {
   "version": 8,
-  "name": "Movitop Offline Styled",
+  "name": "מוביטופ - מפה אופליין",
   "metadata": {
     "maputnik:renderer": "mbgljs"
   },
@@ -11,7 +11,7 @@
       "attribution": "© OpenStreetMap contributors"
     }
   },
-  "sprite": "asset://sprites/sprite",
+  "sprite": "/map/sprites/sprite",
   "glyphs": "/fonts/{fontstack}/{range}.pbf",
   "layers": [
     {
